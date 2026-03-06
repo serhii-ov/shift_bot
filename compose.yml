@@ -1,4 +1,24 @@
 services:
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: always
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD}
+      --appendonly yes
+      --appendfsync everysec
+    
+    volumes:
+      - redis-data:/data
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+
   shifter_bot:
     build: .
     container_name: shifter_bot
@@ -9,26 +29,5 @@ services:
       redis:
         condition: service_healthy
 
-  redis:
-        image: redis:7-alpine
-        container_name: redis
-        restart: always
-        command: >
-          redis-server 
-          --appendonly yes
-          -- appendfsync everysec
-          -- save 60 1000
-        volumes:
-            - redis-data:/data
-
-        healthcheck:
-          test: ["CMD", "redis-cli", "ping"]
-          interval: 5s
-          timeout: 3s
-          retries: 5
-          start_period: 5s
-
 volumes:
-    redis-data:
-      driver: local
-    
+  redis-data:

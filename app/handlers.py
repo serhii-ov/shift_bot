@@ -31,6 +31,7 @@ async def show_action_menu(
 
 @router.message(Command("start"))
 async def start(message: Message, state: FSMContext):
+    # await state.clear()
     await state.set_state(ScheduleFSM.choosing_shift)
     await message.answer("Оберіть зміну:", reply_markup=shift_kb)
 
@@ -44,6 +45,18 @@ async def shift_chosen(message: Message, state: FSMContext):
 
     await message.answer("Що показати?", reply_markup=None)
     await message.answer("Оберіть опцію:", reply_markup=action_kb)
+
+
+@router.callback_query(F.data == "change_shift")
+async def change_shift(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(ScheduleFSM.choosing_shift)
+
+    await callback.message.answer(
+        "Оберіть нову зміну:",
+        reply_markup=shift_kb
+    )
+
+    await callback.answer()
 
 
 @router.callback_query(
@@ -112,7 +125,7 @@ async def handle_date(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     schedule = ShiftSchedule(data["shift"])
 
-    await callback.message.answer(
+    await callback.message.answer(schedule.shift.capitalize() + " - " +
         schedule.date_presentation(selected)
     )
 
@@ -132,7 +145,7 @@ async def handle_week(callback: CallbackQuery, state: FSMContext):
     schedule = ShiftSchedule(data["shift"])
 
     result = "\n".join(
-        schedule.get_days_type_for_week(monday)
+        [schedule.shift.capitalize()] + schedule.get_days_type_for_week(monday)
     )
 
     await callback.message.answer(result)
@@ -151,7 +164,8 @@ async def handle_month(callback: CallbackQuery, state: FSMContext):
     schedule = ShiftSchedule(data["shift"])
 
     result = "\n".join(
-        schedule.get_schedule_for_month(month, year)
+        [schedule.shift.capitalize()] + schedule.get_schedule_for_month(month, year)
+        
     )
 
     await callback.message.answer(result)

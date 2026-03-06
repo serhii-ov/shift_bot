@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+from urllib.parse import quote
 import asyncio
 import logging
 from redis.asyncio import Redis
@@ -12,35 +13,38 @@ from handlers import router
 load_dotenv()
 
 
-async def wait_for_redis(host: str, port: int, timeout: int = 10) -> Redis:
-    while True:
+async def wait_for_redis(timeout: int = 10) -> Redis:
+
+    password = quote(os.getenv("REDIS_PASSWORD"))
+    redis_url = f"redis://:{password}@redis:6379/0"
+
+    for _ in range(timeout):
         try:
-            redis = Redis(
-                host=os.getenv("REDIS_HOST", "redis"),
-                port=int(os.getenv("REDIS_PORT", 6379)),
-                db=int(os.getenv("REDIS_DB", 0)),
+            redis = Redis.from_url(
+                redis_url,
                 decode_responses=True,
+                socket_connect_timeout=5,
+                socket_timeout=5,
             )
+
             await redis.ping()
             logging.info("Connected to Redis")
             return redis
+
         except Exception as e:
             logging.warning(f"Waiting for Redis... {e}")
             await asyncio.sleep(2)
-            timeout -= 1
-            if timeout <= 0:
-                raise TimeoutError("Could not connect to Redis within the timeout period")
+
+    raise TimeoutError("Could not connect to Redis")
 
 
 async def main():
     logging.basicConfig(level=logging.INFO)
 
     bot = Bot(token=os.getenv("TOKEN"))
-    redis = await wait_for_redis(
-        host=os.getenv("REDIS_HOST", "redis"),
-        port=int(os.getenv("REDIS_PORT", 6379)),
-        timeout=10,
-    )
+    
+    redis = await wait_for_redis()
+    
     storage = RedisStorage(redis=redis)
     dp = Dispatcher(storage=storage)
 
